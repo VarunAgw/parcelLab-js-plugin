@@ -1,11 +1,14 @@
 // deps
 const Raven = require('raven-js');
 var _$ = require('cash-dom');
+const { h, render } = require('preact');
+const Layout = require('../components/layout');
+const { getCurrentPluginVersion } = require('../js/lib/api');
+
 if (typeof window.jQuery === 'function')
   _$ = window.jQuery;
 
 // libs
-const Api = require('./lib/api');
 const statics = require('./lib/static');
 const templates = require('../hbs');
 const _settings = require('../settings');
@@ -42,83 +45,30 @@ class ParcelLab {
   initialize() {
     Raven.config('https://2b7ac8796fe140b8b8908749849ff1ce@app.getsentry.com/94336', {
       whitelistUrls: [/cdn\.parcellab\.com/],
-    }).install();
-    this.loading();
-    this.orderNo = this.getUrlQuery('orderNo');
-    this.trackingNo = this.getUrlQuery('trackingNo');
-    this.courier = this.getUrlQuery('courier');
-    this.initLanguage();
-    this.userId = this.getUrlQuery('u');
+    }).install()
+    this.loading()
+    this.orderNo = this.getUrlQuery('orderNo')
+    this.trackingNo = this.getUrlQuery('trackingNo')
+    this.courier = this.getUrlQuery('courier')
+    this.initLanguage()
+    this.userId = this.getUrlQuery('u')
 
-    if (this.propsCheck() === false) return this.showError(); // check yourself before you ...
+    if (this.propsCheck() === false) return this.showError() // check yourself before you ...
 
     // do a self update
-    this.selfUpdate();
+    this.selfUpdate()
 
     // get checkpoints
-    Api.getCheckpoints(this.props(), (err, res)=> {
-      if (err) return this.handleError(err);
-      else if (res && res.header && res.body) {
-        this.checkpoints = res;
-        this.renderLayout(this.checkpoints);
-        this.initActionBox();
-        if (this.options.show_shopInfos) this.initShopInfos();
-        this.bindEvents();
-      } else {
-        this.showError();
-      }
-    });
+    this.renderLayout()
   }
 
   initLanguage() {
-    if (this.getUrlQuery('lang')) this._langCode = this.getUrlQuery('lang');
+    if (this.getUrlQuery('lang')) this._langCode = this.getUrlQuery('lang')
     if (statics.languages[this._langCode]) {
-      this.lang = statics.languages[this._langCode];
+      this.lang = statics.languages[this._langCode]
     } else {
-      this.handleError('Could not detect user language ... fallback to [EN]!');
-      this.lang = statics.languages.en;
-    }
-  }
-
-  initShopInfos() {
-    Api.getShopInfos(this.props(), (err, res)=> {
-      if (err) return this.handleError(err);
-      if (res && res.name && res.address) {
-        this.renderShopInfos(res);
-      }
-    });
-  }
-
-  initActionBox() {
-    if (!this.checkpoints || !this.checkpoints.header) return;
-    if (this.checkpoints.header.length > 1 || !this.checkpoints.header[0]) return;
-    var actionBox = this.checkpoints.header[0].actionBox;
-    if (!actionBox || !actionBox.type) return;
-    switch (actionBox.type) {
-      case 'maps':
-        this.renderActionBox(actionBox);
-        break;
-      case 'vote-courier':
-        this.renderActionBox(actionBox);
-        break;
-      case 'prediction':
-        Api.getPrediction(this.props(), (err, res) => {
-          if (err) this.handleError(err);
-
-          // HACK: this will be killed in newer version
-          if (res && res instanceof Array) {
-            if (res.length === 1) res = res[0].prediction;
-          }
-
-          if (res && res.dateOfMonth && res.month) {
-            if (!res.label &&
-              this.checkpoints.header[0] &&
-              this.checkpoints.header[0].actionBox)
-                res.label = this.checkpoints.header[0].actionBox.label; // fallback
-            this.renderActionBox(res);
-          }
-        });
-        break;
+      this.handleError('Could not detect user language ... fallback to [EN]!')
+      this.lang = statics.languages.en
     }
   }
 
@@ -129,44 +79,44 @@ class ParcelLab {
       courier: this.courier,
       userId: this.userId,
       lang: this.lang,
-    };
+    }
   }
 
   propsCheck() {
-    var result = false;
-    if (this.trackingNo && this.courier) result = true;
-    if (this.orderNo && this.userId) result = true;
-    return result;
+    var result = false
+    if (this.trackingNo && this.courier) result = true
+    if (this.orderNo && this.userId) result = true
+    return result
   }
 
   $find(sel) {
     var buildSelector = (sel)=> {
-      var res = this.rootNodeQuery;
-      if (sel) res += ` ${sel}`;
-      return res;
+      var res = this.rootNodeQuery
+      if (sel) res += ` ${sel}`
+      return res
     };
 
-    return _$(buildSelector(sel));
+    return _$(buildSelector(sel))
   }
 
   handleError(err) {
     if (typeof err === 'string')
-      console.error(`🙀  ${err}`);
+      console.error(`🙀  ${err}`)
     else if (typeof err === 'object') {
-      Raven.captureException(err);
-      console.error(`🙀  ${err.message}`);
+      Raven.captureException(err)
+      console.error(`🙀  ${err.message}`)
     }
   }
 
   lsSet(key, val) {
     try {
-      localStorage.setItem(key, val);
+      localStorage.setItem(key, val)
     } catch (e) {
       if (e.name === 'NS_ERROR_FILE_CORRUPTED') {
         console.log(`😿 Sorry, it looks like your browser storage is corrupted.
         Please clear your storage by going to Tools -> Clear Recent History -> Cookies
         and set time range to 'Everything'.
-        This will remove the corrupted browser storage across all sites.`);
+        This will remove the corrupted browser storage across all sites.`)
       }
     }
   }
@@ -174,36 +124,36 @@ class ParcelLab {
   lsGet(key) {
     var res = null;
     try {
-      res = localStorage.getItem(key);
+      res = localStorage.getItem(key)
     } catch (e) {
       if (e.name === 'NS_ERROR_FILE_CORRUPTED') {
         console.log(`😿 Sorry, it looks like your browser storage is corrupted.
         Please clear your storage by going to Tools -> Clear Recent History -> Cookies
         and set time range to 'Everything'.
-        This will remove the corrupted browser storage across all sites.`);
+        This will remove the corrupted browser storage across all sites.`)
       }
     }
     finally {
-      return res;
+      return res
     }
   }
 
   selfUpdate() {
-    var lastUpdate = this.lsGet('parcelLab.js.updatedAt');
+    var lastUpdate = this.lsGet('parcelLab.js.updatedAt')
 
     // check if selfUpdate was executed in the last 12 h
     if (lastUpdate && lastUpdate > Date.now() - 43200000) {
-      return;
+      return
     }
 
-    console.log('👻 Searching for new parcelLab.js version...');
-    Api.getCurrentPluginVersion((err, versionTag)=> {
-      if (err) return this.lsSet('parcelLab.js.updatedAt', Date.now());
+    console.log('👻 Searching for new parcelLab.js version...')
+    getCurrentPluginVersion((err, versionTag)=> {
+      if (err) return this.lsSet('parcelLab.js.updatedAt', Date.now())
       else {
-        this.lsSet('parcelLab.js.updatedAt', Date.now());
+        this.lsSet('parcelLab.js.updatedAt', Date.now())
         if (versionTag && versionTag !== CURRENT_VERSION_TAG) {
-          console.log('👻 Updating plugin to version ~> ', versionTag);
-          window.location.reload(true);
+          console.log('👻 Updating plugin to version ~> ', versionTag)
+          window.location.reload(true)
         }
       }
     });
@@ -293,13 +243,16 @@ class ParcelLab {
   }
 
   innerHTML(html) {
-    this.loading(false);
-    this.$find().html(html);
+    this.loading(false)
+    this.$find().html(html)
   }
 
   renderLayout(data) {
-    var ctx = { data: data, props: this.props() };
-    this.innerHTML(templates.layout(ctx));
+    this.innerHTML('')
+    render(
+      h(Layout, { ...this.props(), data} ),
+      document.querySelector(this.rootNodeQuery)
+    );
   }
 
   renderActionBox(data) {
