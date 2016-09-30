@@ -1,22 +1,17 @@
 // deps
-const Raven = require('raven-js');
-var _$ = require('cash-dom');
-const { h, render } = require('preact');
-const Layout = require('../components/layout');
-const { getCurrentPluginVersion } = require('../js/lib/api');
-
-if (typeof window.jQuery === 'function')
-  _$ = window.jQuery;
+const Raven = require('raven-js')
+const { h, render } = require('preact')
+const Layout = require('../components/layout')
+const { getCurrentPluginVersion } = require('../js/lib/api')
 
 // libs
-const statics = require('./lib/static');
-const templates = require('../hbs');
-const _settings = require('../settings');
+const statics = require('./lib/static')
+const _settings = require('../settings')
 
 // settings
-const CURRENT_VERSION_TAG = require('raw!../../VERSION_TAG').trim();
-const DEFAULT_ROOT_NODE = _settings.default_root_node;
-const DEFAULT_OPTS = _settings.defualt_opts;
+const CURRENT_VERSION_TAG = require('raw!../../VERSION_TAG').trim()
+const DEFAULT_ROOT_NODE = _settings.default_root_node
+const DEFAULT_OPTS = _settings.defualt_opts
 
 /**
  * {class} ParcelLab
@@ -25,15 +20,16 @@ const DEFAULT_OPTS = _settings.defualt_opts;
  */
 class ParcelLab {
   constructor(rootNodeQuery, opts) {
-    if (!rootNodeQuery) rootNodeQuery = DEFAULT_ROOT_NODE;
+    if (!rootNodeQuery) rootNodeQuery = DEFAULT_ROOT_NODE
     if (rootNodeQuery && typeof rootNodeQuery === 'string') {
-      if (_$(rootNodeQuery).get(0)) {
-        this.rootNodeQuery = rootNodeQuery;
-        this._langCode = navigator.language || navigator.userLanguage;
-        if (!opts && typeof opts !== 'object') opts = DEFAULT_OPTS;
-        this.options = opts;
+      if (document.querySelector(rootNodeQuery)) {
+        this.rootNodeQuery = rootNodeQuery
+        this.$root = document.querySelector(rootNodeQuery)
+        this._langCode = navigator.language || navigator.userLanguage
+        if (!opts && typeof opts !== 'object') opts = DEFAULT_OPTS
+        this.options = opts
       } else {
-        console.error('🙀 Could not find the rootNode ~> ' + rootNodeQuery);
+        console.error('🙀 Could not find the rootNode ~> ' + rootNodeQuery)
       }
     }
   }
@@ -46,20 +42,25 @@ class ParcelLab {
     Raven.config('https://2b7ac8796fe140b8b8908749849ff1ce@app.getsentry.com/94336', {
       whitelistUrls: [/cdn\.parcellab\.com/],
     }).install()
-    this.loading()
+
+    // read props from url
     this.orderNo = this.getUrlQuery('orderNo')
     this.trackingNo = this.getUrlQuery('trackingNo')
+    this.xid = this.getUrlQuery('xid')
     this.courier = this.getUrlQuery('courier')
-    this.initLanguage()
     this.userId = this.getUrlQuery('u')
+    this.initLanguage()
+    if (!this.propsCheck())
+      this.$root.innerHTML = `<div class="pl-alert pl-alert-danger">
+        Cant find this order...</div>`
+    else {
+      // do a self update
+      this.selfUpdate()
 
-    if (this.propsCheck() === false) return this.showError() // check yourself before you ...
+      // preact go!
+      this.renderLayout()
+    }
 
-    // do a self update
-    this.selfUpdate()
-
-    // get checkpoints
-    this.renderLayout()
   }
 
   initLanguage() {
@@ -86,17 +87,18 @@ class ParcelLab {
     var result = false
     if (this.trackingNo && this.courier) result = true
     if (this.orderNo && this.userId) result = true
+    if (this.xid && this.userId) result = true
     return result
   }
 
-  $find(sel) {
-    var buildSelector = (sel)=> {
-      var res = this.rootNodeQuery
-      if (sel) res += ` ${sel}`
-      return res
-    };
-
-    return _$(buildSelector(sel))
+  getUrlQuery(key, url) {
+    if (!url) url = window.location.href
+    key = key.replace(/[\[\]]/g, '\\$&')
+    var regex = new RegExp('[?&]' + key + '(=([^&#]*)|&|#|$)')
+    var results = regex.exec(url)
+    if (!results) return null
+    if (!results[2]) return ''
+    return decodeURIComponent(results[2].replace(/\+/g, ' '))
   }
 
   handleError(err) {
@@ -122,7 +124,7 @@ class ParcelLab {
   }
 
   lsGet(key) {
-    var res = null;
+    var res = null
     try {
       res = localStorage.getItem(key)
     } catch (e) {
@@ -143,7 +145,7 @@ class ParcelLab {
 
     // check if selfUpdate was executed in the last 12 h
     if (lastUpdate && lastUpdate > Date.now() - 43200000) {
-      return
+      return null
     }
 
     console.log('👻 Searching for new parcelLab.js version...')
@@ -156,116 +158,42 @@ class ParcelLab {
           window.location.reload(true)
         }
       }
-    });
-  }
-
-  getUrlQuery(key, url) {
-    if (!url) url = window.location.href;
-    key = key.replace(/[\[\]]/g, '\\$&');
-    var regex = new RegExp('[?&]' + key + '(=([^&#]*)|&|#|$)');
-    var results = regex.exec(url);
-    if (!results) return null;
-    if (!results[2]) return '';
-    return decodeURIComponent(results[2].replace(/\+/g, ' '));
+    })
   }
 
   ///////////////////////////
   // DOM affecting methods //
   ///////////////////////////
 
-  loading(isLoading=true) {
-    if (isLoading) {
-      this.$find().html(`<div class="pl-loading"><i class="fa fa-refresh fa-spin"></i></div>`);
-    } else {
-      this.$find().html('');
-    }
-  }
+  // bindEvents() {
+  //   var _this = this;
+  //   // vote courier
+  //   _this.$find('.pl-courier-vote').on('click', function (e) {
+  //     e.preventDefault();
+  //     var vote = this.dataset.vote;
+  //     _this.$find('.rating-body').html('<i class="fa fa-refresh fa-spin fa-2x"></i>');
+  //     Api.voteCourier(vote, _this.props(), (err)=> {
+  //       if (err) {
+  //         _this.handleError(err);
+  //         _this.$('.rating-body').html(`
+  //           <small style="text-align:center;">
+  //             An Error occurred, we are very sorry 😥
+  //           </small>
+  //         `);
+  //       } else {
+  //         _this.$find('.rating-body').html('<i class="fa fa-check fa-2x"></i>');
+  //       }
+  //     });
+  //   });
+  // }
 
-  showError() {
-    this.innerHTML(`
-      <div class="pl-alert pl-alert-danger">
-        ${statics.translations[this.lang.code].error.delivery}
-      </div>
-    `);
-  }
-
-  bindEvents() {
-    var _this = this;
-
-    // show more checkpoints
-    _this.$find('.pl-action.pl-show-more-button').on('click', (e)=> {
-      e.preventDefault();
-      _this.$find('.pl-row.pl-alert.hidden').removeClass('hidden');
-      _this.$find('.pl-action.pl-show-more-button').remove();
-    });
-
-    // toggle tabs
-    _this.$find('.pl-tab.pl-btn').on('click', function (e) {
-      e.preventDefault();
-      var $this = _$(this);
-      var $allTrackings = _this.$find('div.parcel_lab_tracking');
-
-      // toggle all active
-      _this.$find('.pl-tab.pl-btn').removeClass('pl-active');
-      $this.addClass('pl-active');
-
-      // toggle all hidden
-      $allTrackings.addClass('hidden');
-      _this.$find(`#${$this.attr('href')}`).removeClass('hidden');
-    });
-
-    // vote courier
-    _this.$find('.pl-courier-vote').on('click', function (e) {
-      e.preventDefault();
-      var vote = this.dataset.vote;
-      _this.$find('.rating-body').html('<i class="fa fa-refresh fa-spin fa-2x"></i>');
-      Api.voteCourier(vote, _this.props(), (err)=> {
-        if (err) {
-          _this.handleError(err);
-          _this.$('.rating-body').html(`
-            <small style="text-align:center;">
-              An Error occurred, we are very sorry 😥
-            </small>
-          `);
-        } else {
-          _this.$find('.rating-body').html('<i class="fa fa-check fa-2x"></i>');
-        }
-      });
-    });
-  }
-
-  switchLayout(full) {
-    if (full) {
-      this.$find('main.pl-col-8').removeClass('pl-col-8').addClass('pl-col-12');
-    } else {
-      this.$find('main.pl-col-12').removeClass('pl-col-12').addClass('pl-col-8');
-    }
-  }
-
-  innerHTML(html) {
-    this.loading(false)
-    this.$find().html(html)
-  }
-
-  renderLayout(data) {
-    this.innerHTML('')
+  renderLayout() {
+    this.$root.innerHTML = ''
     render(
-      h(Layout, { ...this.props(), data} ),
-      document.querySelector(this.rootNodeQuery)
-    );
+      h( Layout, { ...this.props(), opts: this.options } ),
+      this.$root
+    )
   }
-
-  renderActionBox(data) {
-    this.switchLayout(false);
-    this.$find('#pl-action-box-container').html(templates.actionBox(data));
-  }
-
-  renderShopInfos(data) {
-    this.switchLayout(false);
-    this.$find('#pl-shop-info-container').html(templates.shopInfos(data));
-    this.$find('#pl-mobile-shop-info-container').html(templates.mobileShopInfos(data));
-  }
-
 }
 
-module.exports = ParcelLab;
+module.exports = ParcelLab

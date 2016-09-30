@@ -10,7 +10,6 @@ class Layout extends Component {
 
     this.state = {
       loading: true,
-      layout: ['4', '12'],
       currentTrackingIndex: 0,
       showMore: false,
       trackings: null,
@@ -21,7 +20,8 @@ class Layout extends Component {
 
   componentWillMount() {
     this.fetchTrackings()
-    if (this.props.showShopInfos) this.fetchShopInfos()
+    if (this.props.opts && this.props.opts.showShopInfos)
+      this.fetchShopInfos()
   }
 
   currentTracking() {
@@ -46,46 +46,46 @@ class Layout extends Component {
   fetchTrackings() {
     Api.getCheckpoints(this.props, (err, res)=> {
       this.setState({ loading: false, })
-      if (err) return this.handleError(err);
+      if (err) return this.handleError(err)
       else if (res && res.header && res.body) {
         this.setState({ trackings: res, })
         this.fetchActionBox()
       } else {
         this.showError()
       }
-    });
+    })
   }
 
   fetchShopInfos() {
     Api.getShopInfos(this.props, (err, res)=> {
-      if (err) return this.handleError(err);
+      if (err) return this.handleError(err)
       if (res && res.name && res.address) {
         this.setState({
           shopInfos: res,
         })
       }
-    });
+    })
   }
 
   fetchActionBox() {
     let ct = this.currentTracking()
-    var actionBox = ct.header.actionBox;
-    if (!actionBox || !actionBox.type) return;
+    var actionBox = ct.header.actionBox
+    if (!actionBox || !actionBox.type) return
     switch (actionBox.type) {
       case 'maps':
-        this.setState({ actionBox });
-        break;
+        this.setState({ actionBox })
+        break
       case 'vote-courier':
-        this.setState({ actionBox });
-        break;
+        this.setState({ actionBox })
+        break
       case 'prediction':
         Api.getPrediction(this.props(), (err, res) => {
-          if (err) this.handleError(err);
+          if (err) this.handleError(err)
           this.setState({
             actionBox : res,
           })
-        });
-        break;
+        })
+        break
     }
   }
 
@@ -116,9 +116,9 @@ class Layout extends Component {
       var res = ''
       var courier = ct.header.courier.prettyname || courier
       res += `${translate('delivery', lang.code)} ${trackingNo} (${courier})`
-      return res;
+      return res
     } else {
-      return 'Unknown tracking';
+      return 'Unknown tracking'
     }
   }
 
@@ -145,43 +145,43 @@ class Layout extends Component {
     let tracking = {
       id: header.id,
       checkpoints: [],
-    };
+    }
 
-    tracking.subHeading = true;
+    tracking.subHeading = true
     checkpoints = body.filter(function (elem) {
-      return elem.shown;
-    });
+      return elem.shown
+    })
 
     checkpoints.forEach((checkpoint, i)=> {
       var cp = {
         button: (i + 3) === checkpoints.length && checkpoints.length > 4,
         checkpoint: checkpoint,
         more: translate('more', lang.code),
-      };
+      }
 
-      var ts = new Date(checkpoint.timestamp);
+      var ts = new Date(checkpoint.timestamp)
       if (acceptedStatusses.indexOf(checkpoint.status) >= 0 && i === (checkpoints.length - 1))
         tracking.prediction = {
           text: translate('predictions', lang.code)[checkpoint.status],
           status: checkpoint.status,
-        };
-      cp.dateText = date(ts, i !== 0, lang.code);
+        }
+      cp.dateText = date(ts, i !== 0, lang.code)
 
-      cp.transitStatus = statics.transitStates[checkpoint.status];
+      cp.transitStatus = statics.transitStates[checkpoint.status]
 
       if (typeof cp.transitStatus === 'undefined')
-        cp.transitStatus = statics.transitStates.default;
+        cp.transitStatus = statics.transitStates.default
 
-      cp.transitStatusColor = cp.transitStatus.color;
-      cp.locationText = checkpoint.location ? ' (' + checkpoint.location + ')' : '';
+      cp.transitStatusColor = cp.transitStatus.color
+      cp.locationText = checkpoint.location ? ' (' + checkpoint.location + ')' : ''
       cp.alert = i === checkpoints.length - 1 ?
         'alert-' + (cp.transitStatus.alert ?
-          cp.transitStatus.alert : 'info') : '';
+          cp.transitStatus.alert : 'info') : ''
 
-      tracking.checkpoints.push(cp);
-    });
+      tracking.checkpoints.push(cp)
+    })
 
-    tracking.checkpoints.reverse();
+    tracking.checkpoints.reverse()
 
     let showMoreBtn = null
     // hide checkpoints if more than 3
@@ -190,7 +190,6 @@ class Layout extends Component {
       // add show more button
       showMoreBtn = this.renderShowmoreButton()
     }
-    console.log(tracking.checkpoints)
     return(
       <div className="parcel_lab_tracking" id={'pl-t-' + tracking.id}>
         <div className="pl-box-body">
@@ -209,7 +208,7 @@ class Layout extends Component {
   }
 
   renderShowmoreButton() {
-    let text = 'showMore'
+    let text = translate('more', this.props.lang.code)
     return (
       <div className="pl-row pl-alert pl-action pl-show-more-button" onClick={this.showMore.bind(this)}>
         <div className="pl-icon">
@@ -246,36 +245,35 @@ class Layout extends Component {
   }
 
   renderTabs() {
-    var { header } = this.state.trackings;
-    var { lang } = this.props;
-    var colSize = header.length === 3 ? 4 : 6;
-    var tabs = [];
+    var { header } = this.state.trackings
+    var { lang } = this.props
+    var colSize = header.length === 3 ? 4 : 6
+    var tabs = []
     header.forEach(function (tracking, index) {
-      var template = { size: colSize };
+      var template = { size: colSize }
       var info = {
         trackingNo: tracking.tracking_number,
         courier: tracking.courier,
         lang: lang.code,
-      };
-      template.signalColourGreen = !tracking.delayed && !tracking.exception ? '#679A34' : '#AAA';
-      template.signalColourOrange = tracking.delayed ? '#F68423' : '#AAA';
-      template.signalColourRed = tracking.exception ? '#CE0711' : '#AAA';
-      template.transitStatus = statics.transitStates[tracking.last_delivery_status.code];
-      template.href = tracking.id;
-      template.object = JSON.stringify(info);
+      }
+      template.signalColourGreen = !tracking.delayed && !tracking.exception ? '#679A34' : '#AAA'
+      template.signalColourOrange = tracking.delayed ? '#F68423' : '#AAA'
+      template.signalColourRed = tracking.exception ? '#CE0711' : '#AAA'
+      template.transitStatus = statics.transitStates[tracking.last_delivery_status.code]
+      template.href = tracking.id
+      template.object = JSON.stringify(info)
       if (typeof template.transitStatus === 'undefined')
-        template.transitStatus = statics.transitStates.default;
-      template.transitStatusColor = template.transitStatus.color;
+        template.transitStatus = statics.transitStates.default
+      template.transitStatusColor = template.transitStatus.color
 
-      tracking.template = template;
-      tabs.push(tracking);
-    });
+      tracking.template = template
+      tabs.push(tracking)
+    })
 
-    var res = '';
+    var res = ''
     if (tabs.length > 1) {
-      return tabs.map((t, i)=> this.renderTab(t, i));
-    } else
-      return null;
+      return tabs.map((t, i)=> this.renderTab(t, i))
+    } else return null
   }
 
   renderTab(t, i) {
@@ -283,12 +281,12 @@ class Layout extends Component {
     let { currentTrackingIndex } = this.state
     let active = (currentTrackingIndex === i ) ? 'active' : ''
     return(
-      <div className={"pl-col pl-col-" + tab.size} onClick={this.setCurrentTracking.bind(this, i)}>
+      <div className={"pl-col pl-col-" + tab.size} onClick={this.setCurrentTracking.bind(this, i)} key={i}>
         <div className={"pl-tab pl-btn pl-btn-default pl-" + active} href={"pl-t-" + tab.href}>
           <input type="hidden" className="objectHolder" value={tab.object} />
           <div className="pl-icon">
             <span className="fa-stack fa-lg" style={{ color: tab.transitStatusColor }}>
-              <i className="fa fa-circle fa-stack-2x" style="opacity:.4;"></i>
+              <i className="fa fa-circle fa-stack-2x" style={{opacity: '.4'}}></i>
               <i className={"fa fa-" + tab.transitStatus.icon + " fa-stack-1x"}></i>
             </span>
           </div>
@@ -307,35 +305,170 @@ class Layout extends Component {
     )
   }
 
+  generateSocialLinks(socials) {
+    let result = []
+    let colors = {
+      facebook: '#3b5999',
+      instagram: '#3f729b',
+      pinterest: '#bd081c',
+      twitter: '#55acee',
+      'google-plus': '#dd4b39',
+    }
+    for (var social in socials) {
+      let url = socials[social]
+      let color = colors[social] ? colors[social] : '#ddd'
+      result.push(
+        <a href={url} target="_blank" alt={social}>
+          <span class="fa-stack fa-lg">
+              <i class="fa fa-circle fa-stack-2x" style={{color: '#e0e0e0', opacity: '.4'}}></i>
+              <i class={"fa fa-" + social + " fa-stack-1x"} style={{ color : color }}></i>
+          </span>
+        </a>
+      )
+    }
+    return result
+  }
+
+  generateContactLink(pemail) {
+    var emailTest = /\S+@\S+\.\S+/;
+    if (emailTest.test(pemail))
+      return <a href={ "mailto:" + pemail }>{ pemail }</a>
+    else
+      return <a href={ pemail } _target="blank">{ pemail }</a>
+  }
+
+  generateAddressBlock(address) {
+    return (
+      <address>
+        { address.street } <br/>
+        { address.zip_code } { address.city }
+      </address>
+    )
+  }
+
+  renderShopInfos() {
+    let { address, contact, customisation, name, social } = this.state.shopInfos
+    let addressBlock = null
+    let contactLink = null
+    let socialLinks = null
+
+    if (address)
+      addressBlock = this.generateAddressBlock(address)
+
+    if (contact.pubEmail)
+      contactLink = this.generateContactLink(contact.pubEmail)
+
+    if (social)
+      socialLinks = this.generateSocialLinks(social)
+
+    return (
+      <div>
+        <div class="hide-on-desktop" style="margin-bottom:25px;">
+          <a href={ contact.website } target="_blank">
+              <img src={ customisation.logoUrl } alt={name.full} class="img-responsive" style="margin-bottom: 6px; max-height:80px;" />
+          </a>
+        </div>
+
+
+        <div class="pl-box hide-on-mobile" style="margin-bottom: 25px; padding: 20px 0px;">
+          <div class="pl-box-body">
+            <a  href={ contact.website } target="_blank">
+                <img src={ customisation.logoUrl } alt={ name.full } class="img-responsive" style="margin-bottom: 6px;" />
+            </a>
+
+
+            { name.full }
+            { addressBlock }
+            { contactLink }
+
+            <br />
+            <a href={ contact.website } target="_blank">{ contact.website }</a>
+            <br />
+            <div style="text-align: center; margin-top:40px;">
+              { socialLinks }
+            </div>
+
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  renderMobileShopInfos() {
+    let { address, contact, customisation, name, social } = this.state.shopInfos
+    let addressBlock = null,
+        contactLink = null,
+        socialLinks = null
+
+    if (address)
+      addressBlock = this.generateAddressBlock(address)
+
+    if (contact.pubEmail)
+      contactLink = this.generateContactLink(contact.pubEmail)
+
+    if (social)
+      socialLinks = this.generateSocialLinks(social)
+
+    return(
+      <div class="pl-box hide-on-desktop" style={{margin: '25px 0', padding: '20px 0px'}}>
+        <div class="pl-box-body">
+          { name.full }
+          { addressBlock }
+          { contactLink }
+          <br />
+          <a href={contact.website} target="_blank">{ contact.website }</a>
+          <br />
+          <div style={{textAlign: 'center', marginTop: 40}}>
+            { socialLinks }
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   render() {
+    // loading...
     if (this.state.loading) return <div style={{ textAlign: 'center' }}>Loading ...</div>
+
+    let layout = ['12', '12']
+    let shopInfos = null
+    let actionBox = null
+    let mobileShopInfos = null
+
+    if (this.state.shopInfos)
+      layout = ['4' , '8']
+      shopInfos = this.renderShopInfos()
+      mobileShopInfos = this.renderMobileShopInfos()
+
     return (
       <div>
         <div className="pl-col-row">
-          <aside  style={{display: 'none'}} className={"pl-box-aside pl-col pl-col-" + this.state.layout[0]}>
-            <div id="pl-shop-info-container"></div>
-            <div id="pl-action-box-container"></div>
+          <aside  style={{display: 'none'}} className={"pl-box-aside pl-col pl-col-" + layout[0]}>
+            <div id="pl-shop-info-container">{ shopInfos }</div>
+            <div id="pl-action-box-container">{ actionBox }</div>
           </aside>
 
 
-          <main className={"pl-main pl-box pl-col pl-col-" + this.state.layout[1]}>
+          <main className={"pl-main pl-box pl-col pl-col-" + layout[1]}>
 
               <div className="pl-box-heading" style={{marginBottom: 15}}>
-                {this.renderHeading()}
+                { this.renderHeading() }
               </div>
 
               {/* Tabs */}
               <div className="pl-container" style={{padding: "0 25px"}}>
-                {this.renderTabs()}
+                { this.renderTabs() }
               </div>
 
-              {this.renderCurrentTracking()}
+              { this.renderCurrentTracking() }
 
           </main>
 
         </div>
 
-        <div id="pl-mobile-shop-info-container" className="hide-on-desktop"></div>
+        <div id="pl-mobile-shop-info-container" className="hide-on-desktop">
+          { mobileShopInfos }
+        </div>
       </div>
     )
   }
