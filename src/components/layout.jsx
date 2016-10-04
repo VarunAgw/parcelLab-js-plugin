@@ -1,7 +1,11 @@
-const { h, Component } = require('preact')
-const { translate, date } = require('../js/lib/translator')
-const Api = require('../js/lib/api')
-const statics = require('../js/lib/static')
+import { h, Component } from 'preact'
+import { translate, date } from '../js/lib/translator'
+import { Map, CourierVote, Prediction } from './actionBox'
+import { ShopInfos, MobileShopInfos } from './shopInfos'
+import { Checkpoint } from './checkpoint'
+import { Tracking } from './tracking'
+import Api from '../js/lib/api'
+import statics from '../js/lib/static'
 
 class Layout extends Component {
 
@@ -13,7 +17,6 @@ class Layout extends Component {
       currentTrackingIndex: 0,
       showMore: false,
       trackings: null,
-      error: null,
     }
 
   }
@@ -35,21 +38,44 @@ class Layout extends Component {
     return ct
   }
 
+  addPredictions(predictions=[]) {
+    let { trackings } = this.state
+    predictions.forEach((p)=> {
+      trackings.header = trackings.header.map((h)=> {
+        if (h.id === p._ref) {
+          h.actionBox.prediction = p.prediction
+        }
+        return h
+      })
+    })
+
+    this.setState({ trackings })
+  }
+
   handleError(err) {
-    console.error(err)
+    if (this.props.handleError) {
+      this.props.handleError(err)
+    } else {
+      console.error(err)
+    }
   }
 
   ///////////////
   // DATA SHIT //
   ///////////////
 
+  _apiProps() {
+    let { opts, handleError, ...others } = this.props
+    return others
+  }
+
   fetchTrackings() {
-    Api.getCheckpoints(this.props, (err, res)=> {
+    Api.getCheckpoints(this._apiProps(), (err, res)=> {
       this.setState({ loading: false, })
       if (err) return this.handleError(err)
       else if (res && res.header && res.body) {
         this.setState({ trackings: res, })
-        this.fetchActionBox()
+        this.fetchActionBoxes()
       } else {
         this.showError()
       }
@@ -57,7 +83,7 @@ class Layout extends Component {
   }
 
   fetchShopInfos() {
-    Api.getShopInfos(this.props, (err, res)=> {
+    Api.getShopInfos(this._apiProps(), (err, res)=> {
       if (err) return this.handleError(err)
       if (res && res.name && res.address) {
         this.setState({
@@ -67,26 +93,29 @@ class Layout extends Component {
     })
   }
 
-  fetchActionBox() {
-    let ct = this.currentTracking()
-    var actionBox = ct.header.actionBox
-    if (!actionBox || !actionBox.type) return
-    switch (actionBox.type) {
-      case 'maps':
-        this.setState({ actionBox })
-        break
-      case 'vote-courier':
-        this.setState({ actionBox })
-        break
-      case 'prediction':
-        Api.getPrediction(this.props(), (err, res) => {
-          if (err) this.handleError(err)
-          this.setState({
-            actionBox : res,
+  fetchActionBoxes() {
+    let { trackings } = this.state
+    if (trackings && trackings.header && trackings.header.length > 0) {
+      trackings.header.forEach((th)=> {
+        if (th.actionBox && th.actionBox.type && th.actionBox.type === 'prediction') {
+          Api.getPrediction(this._apiProps(), (err, res) => {
+            if (err) this.handleError(err)
+            if (res) this.addPredictions(res)
           })
-        })
-        break
+        }
+      })
     }
+  }
+
+  handleVote(vote) {
+    Api.voteCourier(vote, this._apiProps(), (err)=> {
+      if (err) {
+        this.handleError(err)
+        this.setState({ voteError: true })
+      } else {
+        this.setState({ voteSuccess: true })
+      }
+    });
   }
 
   /////////////////////
@@ -98,7 +127,7 @@ class Layout extends Component {
       this.setState({ currentTrackingIndex: i, showMore: false, })
   }
 
-  showMore() {
+  handleShowMore() {
     this.setState({ showMore: true })
   }
 
@@ -122,125 +151,16 @@ class Layout extends Component {
     }
   }
 
-  renderFurtherInfosLink() {
-    let currentTracking = this.currentTracking()
-    let courier = currentTracking.header.courier
-    if (courier && courier.trackingurl)
-      return <a href={courier.trackingurl} target="_blank">
-        <i class="fa fa-lightbulb-o"></i> {courier.trackingurl_label}
-      </a>
-    else
-      return <span style={{ opacity: '.6' }}>
-        <i class="fa fa-lightbulb-o"></i> ${courier.trackingurl_label}
-      </span>
-  }
-
   renderCurrentTracking() {
     let { header, body } = this.currentTracking()
     let { lang } = this.props
-    let checkpoints = []
-    let acceptedStatusses = 'OutForDelivery DestinationDeliveryCenter'
-    let furtherInfosText = ''
-
-    let tracking = {
-      id: header.id,
-      checkpoints: [],
-    }
-
-    tracking.subHeading = true
-    checkpoints = body.filter(function (elem) {
-      return elem.shown
-    })
-
-    checkpoints.forEach((checkpoint, i)=> {
-      var cp = {
-        button: (i + 3) === checkpoints.length && checkpoints.length > 4,
-        checkpoint: checkpoint,
-        more: translate('more', lang.code),
-      }
-
-      var ts = new Date(checkpoint.timestamp)
-      if (acceptedStatusses.indexOf(checkpoint.status) >= 0 && i === (checkpoints.length - 1))
-        tracking.prediction = {
-          text: translate('predictions', lang.code)[checkpoint.status],
-          status: checkpoint.status,
-        }
-      cp.dateText = date(ts, i !== 0, lang.code)
-
-      cp.transitStatus = statics.transitStates[checkpoint.status]
-
-      if (typeof cp.transitStatus === 'undefined')
-        cp.transitStatus = statics.transitStates.default
-
-      cp.transitStatusColor = cp.transitStatus.color
-      cp.locationText = checkpoint.location ? ' (' + checkpoint.location + ')' : ''
-      cp.alert = i === checkpoints.length - 1 ?
-        'alert-' + (cp.transitStatus.alert ?
-          cp.transitStatus.alert : 'info') : ''
-
-      tracking.checkpoints.push(cp)
-    })
-
-    tracking.checkpoints.reverse()
-
-    let showMoreBtn = null
-    // hide checkpoints if more than 3
-    if (tracking.checkpoints.length > 3 && !this.state.showMore) {
-      tracking.checkpoints = tracking.checkpoints.splice(0, 3)
-      // add show more button
-      showMoreBtn = this.renderShowmoreButton()
-    }
     return(
-      <div className="parcel_lab_tracking" id={'pl-t-' + tracking.id}>
-        <div className="pl-box-body">
-
-            <div className="pl-padded">
-              {tracking.checkpoints.map((cp, i)=> this.renderCheckpoint(cp, i))}
-              { showMoreBtn }
-            </div>
-
-          </div>
-        <div className="pl-box-footer">
-          {this.renderFurtherInfosLink()}
-        </div>
-      </div>
-    )
-  }
-
-  renderShowmoreButton() {
-    let text = translate('more', this.props.lang.code)
-    return (
-      <div className="pl-row pl-alert pl-action pl-show-more-button" onClick={this.showMore.bind(this)}>
-        <div className="pl-icon">
-          <span className="fa-stack fa-lg">
-            <i className="fa fa-circle fa-stack-2x" style={{color:'#eee'}}></i>
-            <i className="fa fa-ellipsis-h fa-stack-1x fa-inverse"></i>
-          </span>
-        </div>
-        <div className="pl-text pl-show-more-text">
-          { text }
-          <br/>
-        </div>
-      </div>
-    )
-  }
-
-  renderCheckpoint(cp, i) {
-    let { button, more, alert, checkpoint_hidden, transitStatusColor, transitStatus, dateText, locationText, checkpoint, } = cp
-    return(
-      <div className={"pl-row pl-alert pl-" + alert} key={i}>
-        <div className="pl-icon">
-          <span className="fa-stack fa-lg" style={{color: transitStatusColor}}>
-            <i className="fa fa-circle fa-stack-2x"
-              style={{color: transitStatusColor, opacity:'.2'}}></i>
-            <i className={"fa fa-" + transitStatus.icon + " fa-stack-1x fa-inverse"} style={{color : transitStatusColor}}></i>
-          </span>
-        </div>
-        <div className="pl-text">
-          <small>{ dateText }  { locationText }</small><br />
-          <b>{ checkpoint.status_text }</b>: { checkpoint.status_details }
-        </div>
-      </div>
+      <Tracking
+        header={header}
+        body={body}
+        lang={lang}
+        handleShowMore={this.handleShowMore.bind(this)}
+        showMore={this.state.showMore} />
     )
   }
 
@@ -293,9 +213,9 @@ class Layout extends Component {
           <div>
             <span>{courier.prettyname}</span>
             <span className="pl-status">
-              <i style={{ color: tab.signalColourGreen }} className="fa fa-circle"></i>
-              <i style={{ color: tab.signalColourOrange }} className="fa fa-circle"></i>
-              <i style={{ color: tab.signalColourRed }} className="fa fa-circle"></i>
+              <i style={ `color: ${tab.signalColourGreen};` } className="fa fa-circle"></i>
+              <i style={ `color: ${tab.signalColourOrange};` } className="fa fa-circle"></i>
+              <i style={ `color: ${tab.signalColourRed};` } className="fa fa-circle"></i>
             </span>
             <br />
             <span>{tracking_number}</span>
@@ -305,140 +225,53 @@ class Layout extends Component {
     )
   }
 
-  generateSocialLinks(socials) {
-    let result = []
-    let colors = {
-      facebook: '#3b5999',
-      instagram: '#3f729b',
-      pinterest: '#bd081c',
-      twitter: '#55acee',
-      'google-plus': '#dd4b39',
+  renderActionBox() {
+    let ct = this.currentTracking()
+    let result = null
+    if (ct && ct.header && ct.header.actionBox) {
+      let { actionBox } = ct.header
+      switch (actionBox.type) {
+        case 'vote-courier':
+          result = <CourierVote actionBox={actionBox} handleVote={this.handleVote.bind(this)} voteSuccess={this.state.voteSuccess} voteError={this.state.voteError} />
+          break
+        case 'maps':
+          if (actionBox.address)
+            result = <Map actionBox={actionBox} />
+          break
+        case 'prediction':
+          if (actionBox.prediction && actionBox.prediction.dateOfMonth)
+            result = <Prediction actionBox={actionBox} />
+          break
+      }
     }
-    for (var social in socials) {
-      let url = socials[social]
-      let color = colors[social] ? colors[social] : '#ddd'
-      result.push(
-        <a href={url} target="_blank" alt={social}>
-          <span class="fa-stack fa-lg">
-              <i class="fa fa-circle fa-stack-2x" style={{color: '#e0e0e0', opacity: '.4'}}></i>
-              <i class={"fa fa-" + social + " fa-stack-1x"} style={{ color : color }}></i>
-          </span>
-        </a>
-      )
-    }
+
+
     return result
   }
 
-  generateContactLink(pemail) {
-    var emailTest = /\S+@\S+\.\S+/;
-    if (emailTest.test(pemail))
-      return <a href={ "mailto:" + pemail }>{ pemail }</a>
-    else
-      return <a href={ pemail } _target="blank">{ pemail }</a>
-  }
-
-  generateAddressBlock(address) {
+  renderAlert(text) {
     return (
-      <address>
-        { address.street } <br/>
-        { address.zip_code } { address.city }
-      </address>
-    )
-  }
-
-  renderShopInfos() {
-    let { address, contact, customisation, name, social } = this.state.shopInfos
-    let addressBlock = null
-    let contactLink = null
-    let socialLinks = null
-
-    if (address)
-      addressBlock = this.generateAddressBlock(address)
-
-    if (contact.pubEmail)
-      contactLink = this.generateContactLink(contact.pubEmail)
-
-    if (social)
-      socialLinks = this.generateSocialLinks(social)
-
-    return (
-      <div>
-        <div class="hide-on-desktop" style="margin-bottom:25px;">
-          <a href={ contact.website } target="_blank">
-              <img src={ customisation.logoUrl } alt={name.full} class="img-responsive" style="margin-bottom: 6px; max-height:80px;" />
-          </a>
-        </div>
-
-
-        <div class="pl-box hide-on-mobile" style="margin-bottom: 25px; padding: 20px 0px;">
-          <div class="pl-box-body">
-            <a  href={ contact.website } target="_blank">
-                <img src={ customisation.logoUrl } alt={ name.full } class="img-responsive" style="margin-bottom: 6px;" />
-            </a>
-
-
-            { name.full }
-            { addressBlock }
-            { contactLink }
-
-            <br />
-            <a href={ contact.website } target="_blank">{ contact.website }</a>
-            <br />
-            <div style="text-align: center; margin-top:40px;">
-              { socialLinks }
-            </div>
-
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  renderMobileShopInfos() {
-    let { address, contact, customisation, name, social } = this.state.shopInfos
-    let addressBlock = null,
-        contactLink = null,
-        socialLinks = null
-
-    if (address)
-      addressBlock = this.generateAddressBlock(address)
-
-    if (contact.pubEmail)
-      contactLink = this.generateContactLink(contact.pubEmail)
-
-    if (social)
-      socialLinks = this.generateSocialLinks(social)
-
-    return(
-      <div class="pl-box hide-on-desktop" style={{margin: '25px 0', padding: '20px 0px'}}>
-        <div class="pl-box-body">
-          { name.full }
-          { addressBlock }
-          { contactLink }
-          <br />
-          <a href={contact.website} target="_blank">{ contact.website }</a>
-          <br />
-          <div style={{textAlign: 'center', marginTop: 40}}>
-            { socialLinks }
-          </div>
-        </div>
-      </div>
+      <div class="pl-alert pl-alert-danger">{ text }</div>
     )
   }
 
   render() {
     // loading...
     if (this.state.loading) return <div style={{ textAlign: 'center' }}>Loading ...</div>
+    if (!this.state.trackings) return this.renderAlert("Can't find this tracking...")
 
     let layout = ['12', '12']
+    let actionBox = this.renderActionBox()
+
     let shopInfos = null
-    let actionBox = null
     let mobileShopInfos = null
 
-    if (this.state.shopInfos)
+    if (this.state.shopInfos || actionBox)
       layout = ['4' , '8']
-      shopInfos = this.renderShopInfos()
-      mobileShopInfos = this.renderMobileShopInfos()
+      if (this.state.shopInfos) {
+        shopInfos = <ShopInfos {...this.state.shopInfos}></ShopInfos>
+        mobileShopInfos = <MobileShopInfos {...this.state.shopInfos}></MobileShopInfos>
+      }
 
     return (
       <div>
@@ -451,12 +284,12 @@ class Layout extends Component {
 
           <main className={"pl-main pl-box pl-col pl-col-" + layout[1]}>
 
-              <div className="pl-box-heading" style={{marginBottom: 15}}>
+              <div className="pl-box-heading" style={ 'margin-bottom:15px;' }>
                 { this.renderHeading() }
               </div>
 
               {/* Tabs */}
-              <div className="pl-container" style={{padding: "0 25px"}}>
+              <div className="pl-container" style={ 'padding:0 25px;' }>
                 { this.renderTabs() }
               </div>
 
@@ -474,4 +307,4 @@ class Layout extends Component {
   }
 }
 
-module.exports = Layout
+export { Layout }

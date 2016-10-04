@@ -1,7 +1,7 @@
 // deps
 const Raven = require('raven-js')
 const { h, render } = require('preact')
-const Layout = require('../components/layout')
+const { Layout } = require('../components/layout')
 const { getCurrentPluginVersion } = require('../js/lib/api')
 
 // libs
@@ -52,7 +52,7 @@ class ParcelLab {
     this.initLanguage()
     if (!this.propsCheck())
       this.$root.innerHTML = `<div class="pl-alert pl-alert-danger">
-        Cant find this order...</div>`
+        Can't find this tracking...</div>`
     else {
       // do a self update
       this.selfUpdate()
@@ -165,32 +165,10 @@ class ParcelLab {
   // DOM affecting methods //
   ///////////////////////////
 
-  // bindEvents() {
-  //   var _this = this;
-  //   // vote courier
-  //   _this.$find('.pl-courier-vote').on('click', function (e) {
-  //     e.preventDefault();
-  //     var vote = this.dataset.vote;
-  //     _this.$find('.rating-body').html('<i class="fa fa-refresh fa-spin fa-2x"></i>');
-  //     Api.voteCourier(vote, _this.props(), (err)=> {
-  //       if (err) {
-  //         _this.handleError(err);
-  //         _this.$('.rating-body').html(`
-  //           <small style="text-align:center;">
-  //             An Error occurred, we are very sorry 😥
-  //           </small>
-  //         `);
-  //       } else {
-  //         _this.$find('.rating-body').html('<i class="fa fa-check fa-2x"></i>');
-  //       }
-  //     });
-  //   });
-  // }
-
   renderLayout() {
     this.$root.innerHTML = ''
     render(
-      h( Layout, { ...this.props(), opts: this.options } ),
+      h( Layout, { ...this.props(), opts: this.options, handleError: this.handleError } ),
       this.$root
     )
   }
