@@ -27,9 +27,14 @@ var generateSocialLinks = (socials)=> {
 var generateContactLink = (pemail)=> {
   var emailTest = /\S+@\S+\.\S+/;
   if (emailTest.test(pemail))
-    return <a href={ "mailto:" + pemail }>{ pemail }</a>
+    return <a href={ "mailto:" + pemail }> <i className="fa fa-envelope-o"></i> { pemail }</a>
   else
-    return <a href={ pemail } _target="blank">{ pemail }</a>
+    return <a href={ pemail } _target="blank"> <i className="fa fa-globe"></i> { pemail }</a>
+}
+
+var generatePhoneLink = (phone)=> {
+  if (phone)
+    return <a href={ `tel:${phone}` }><i class="fa fa-fw fa-phone"></i> { phone }</a>
 }
 
 var generateAddressBlock = (address)=> {
@@ -42,15 +47,19 @@ var generateAddressBlock = (address)=> {
 }
 
 const ShopInfos = ({ address, contact, customisation, name, social })=> {
-  let addressBlock = null
-  let contactLink = null
-  let socialLinks = null
+  let addressBlock = null,
+      contactLink = null,
+      phoneLink = null,
+      socialLinks = null
 
   if (address)
     addressBlock = generateAddressBlock(address)
 
   if (contact.pubEmail)
     contactLink = generateContactLink(contact.pubEmail)
+
+  if (contact.phone)
+    phoneLink = generatePhoneLink(contact.phone)
 
   if (social)
     socialLinks = generateSocialLinks(social)
@@ -73,11 +82,9 @@ const ShopInfos = ({ address, contact, customisation, name, social })=> {
 
           <b dangerouslySetInnerHTML={{ __html: name.full }} ></b>
           { addressBlock }
-          { contactLink }
-
-          <br />
-          <a href={ contact.website } target="_blank">{ contact.website }</a>
-          <br />
+          { phoneLink } <br/>
+          { contactLink } <br/>
+          { generateContactLink(contact.website) } <br />
           <div style={{textAlign: 'center', marginTop: 40}}>
             { socialLinks }
           </div>
@@ -91,6 +98,7 @@ const ShopInfos = ({ address, contact, customisation, name, social })=> {
 const MobileShopInfos = ({ address, contact, customisation, name, social })=> {
   let addressBlock = null,
       contactLink = null,
+      phoneLink = null,
       socialLinks = null
 
   if (address)
@@ -98,6 +106,9 @@ const MobileShopInfos = ({ address, contact, customisation, name, social })=> {
 
   if (contact.pubEmail)
     contactLink = generateContactLink(contact.pubEmail)
+
+  if (contact.phone)
+    phoneLink = generatePhoneLink(contact.phone)
 
   if (social)
     socialLinks = generateSocialLinks(social)
@@ -107,10 +118,9 @@ const MobileShopInfos = ({ address, contact, customisation, name, social })=> {
       <div className="pl-box-body">
         { name.full }
         { addressBlock }
-        { contactLink }
-        <br />
-        <a href={contact.website} target="_blank">{ contact.website }</a>
-        <br />
+        { phoneLink } <br />
+        { contactLink } <br />
+        { generateContactLink(contact.website) } <br />
         <div style={{textAlign: 'center', marginTop: 40}}>
           { socialLinks }
         </div>

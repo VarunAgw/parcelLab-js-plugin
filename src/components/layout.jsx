@@ -23,7 +23,7 @@ class Layout extends Component {
 
   componentWillMount() {
     this.fetchTrackings()
-    if (this.props.opts && this.props.opts.showShopInfos)
+    if (this.props.opts && this.props.opts.show_shopInfos)
       this.fetchShopInfos()
   }
 
